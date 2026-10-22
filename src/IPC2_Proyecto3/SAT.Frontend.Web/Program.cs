@@ -1,22 +1,26 @@
+using System;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+// Habilitar Razor Pages
 builder.Services.AddRazorPages();
+
+// Configurar HttpClient para comunicarse con el Servicio 2 (Backend API)
+builder.Services.AddHttpClient("SatApi", client =>
+{
+    client.BaseAddress = new Uri("http://localhost:5297/");
+});
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error");
 }
 
+app.UseStaticFiles();
 app.UseRouting();
-
 app.UseAuthorization();
-
-app.MapStaticAssets();
-app.MapRazorPages()
-   .WithStaticAssets();
+app.MapRazorPages();
 
 app.Run();

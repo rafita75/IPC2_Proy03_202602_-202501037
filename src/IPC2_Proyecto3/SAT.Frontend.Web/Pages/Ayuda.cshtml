@@ -1,0 +1,77 @@
+﻿@page
+@{
+    ViewData["Title"] = "Ayuda";
+}
+
+<div class="row mb-4">
+    <div class="col-12">
+        <h2 class="fw-bold text-primary">Centro de Ayuda</h2>
+        <p class="text-muted">Selecciona una de las opciones para visualizar los datos del desarrollador o la documentación técnica del sistema.</p>
+    </div>
+</div>
+
+<!-- Pestañas para las 2 opciones requeridas -->
+<ul class="nav nav-tabs mb-4" id="ayudaTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active fw-bold" id="estudiante-tab" data-bs-toggle="tab" data-bs-target="#estudiante" type="button" role="tab">
+            1. Información del Estudiante
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link fw-bold" id="doc-tab" data-bs-toggle="tab" data-bs-target="#documentacion" type="button" role="tab">
+            2. Documentación del Programa
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content" id="ayudaTabsContent">
+    <!-- Opción 1: Información del Estudiante -->
+    <div class="tab-pane fade show active" id="estudiante" role="tabpanel">
+        <div class="card shadow-sm border-primary">
+            <div class="card-header bg-primary text-white fw-bold">
+                Datos del Estudiante Desarrollador
+            </div>
+            <div class="card-body">
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item"><strong>Nombre:</strong> Angel Rafael Juárez Higueros</li>
+                    <li class="list-group-item"><strong>Carné:</strong> 202501037</li>
+                    <li class="list-group-item"><strong>Curso:</strong> Introducción a la Programación y Computación 2 (IPC2)</li>
+                    <li class="list-group-item"><strong>Proyecto:</strong> Proyecto 3 - Servicio de Autorización de DTE (SAT)</li>
+                    <li class="list-group-item"><strong>Universidad:</strong> Universidad de San Carlos de Guatemala (Facultad de Ingeniería - Escuela de Ciencias y Sistemas)</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Opción 2: Documentación del Programa -->
+    <div class="tab-pane fade" id="documentacion" role="tabpanel">
+        <div class="card shadow-sm border-dark">
+            <div class="card-header bg-dark text-white fw-bold">
+                Resumen Técnico y Manual del Sistema
+            </div>
+            <div class="card-body">
+                <h5 class="fw-bold text-primary">Arquitectura del Sistema</h5>
+                <p>
+                    El sistema está dividido en dos aplicaciones construidas en <strong>.NET Core (C#)</strong> bajo el paradigma de Programación Orientada a Objetos (POO) que se comunican mediante el protocolo <strong>HTTP</strong> intercambiando mensajes en formato <strong>JSON</strong>:
+                </p>
+                <ul>
+                    <li><strong>Programa 1 (Frontend - Razor Pages):</strong> Simulador web encargado de enviar lotes JSON, inicializar el sistema y consultar reportes estadísticos.</li>
+                    <li><strong>Servicio 2 (Backend - Web API):</strong> Servicio REST encargado de validar NITs con el algoritmo Módulo 11, extraer fechas mediante Expresiones Regulares (Regex), generar correlativos diarios (<code>yyyymmdd########</code>) y almacenar la información de forma persistente en archivos JSON.</li>
+                </ul>
+
+                <h5 class="fw-bold text-primary mt-4">Endpoints Principales de la API</h5>
+                <ul>
+                    <li><code>POST /Procesar</code>: Procesa archivos JSON de actualización de RTU o solicitudes de autorización de facturas (DTE).</li>
+                    <li><code>POST /Resetear</code>: Reinicia la memoria y limpia los archivos persistentes al estado inicial.</li>
+                    <li><code>GET /ConsultaDatos</code>: Consulta de facturas emitidas o recibidas por NIT en un rango de fechas.</li>
+                    <li><code>GET /ResumenIva</code>: Resumen de IVA emitido y recibido por NIT en una fecha específica.</li>
+                    <li><code>GET /ResumenRango</code>: Valores autorizados (Totales o Sin IVA) y conteo detallado de errores por fecha.</li>
+                </ul>
+
+                <div class="alert alert-secondary mt-3 mb-0">
+                    <strong>Nota:</strong> El ensayo completo y los diagramas UML (Clases, Actividades y Despliegue) se encuentran almacenados en la carpeta <code>/Documentacion</code> del repositorio oficial del proyecto.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
