@@ -189,5 +189,51 @@ namespace SAT.Backend.API.Controllers
                 ReportePorFechas = reportePorFechas
             });
         }
+
+        /// <summary>
+        /// 4. Endpoint /Grafica sugerido en la Fig. 2 para devolver las series de datos de las gráficas.
+        /// Parámetros: tipo = "iva" (requiere fecha) o "rango" (requiere fechaInicio, fechaFin, mostrarTotales).
+        /// </summary>
+        [HttpGet("/Grafica")]
+        public IActionResult ObtenerDatosGrafica(
+            [FromQuery] string tipo = "iva",
+            [FromQuery] string fecha = "",
+            [FromQuery] string fechaInicio = "",
+            [FromQuery] string fechaFin = "",
+            [FromQuery] bool mostrarTotales = true)
+        {
+            if (tipo.Trim().Equals("iva", StringComparison.OrdinalIgnoreCase))
+            {
+                var resultadoIva = ObtenerResumenIva(fecha);
+                if (resultadoIva.Result is OkObjectResult okIva && okIva.Value is ResumenIvaFechaDto dtoIva)
+                {
+                    return Ok(new
+                    {
+                        tipoGrafica = "Resumen de IVA por Fecha y NIT",
+                        fecha = dtoIva.Fecha,
+                        etiquetasNits = dtoIva.MovimientosPorNit.Select(m => m.Nit).ToList(),
+                        ivaEmitido = dtoIva.MovimientosPorNit.Select(m => m.IvaEmitido).ToList(),
+                        ivaRecibido = dtoIva.MovimientosPorNit.Select(m => m.IvaRecibido).ToList()
+                    });
+                }
+                return BadRequest(new { error = "Parámetros inválidos para gráfica de IVA." });
+            }
+            else
+            {
+                var resultadoRango = ObtenerResumenRango(fechaInicio, fechaFin, mostrarTotales);
+                if (resultadoRango.Result is OkObjectResult okRango && okRango.Value is ResumenRangoFechasDto dtoRango)
+                {
+                    return Ok(new
+                    {
+                        tipoGrafica = mostrarTotales ? "Valores Totales Autorizados por Fecha" : "Valores Sin IVA Autorizados por Fecha",
+                        fechaInicio = dtoRango.FechaInicio,
+                        fechaFin = dtoRango.FechaFin,
+                        etiquetasFechas = dtoRango.ReportePorFechas.Select(r => r.Fecha).ToList(),
+                        valoresAutorizados = dtoRango.ReportePorFechas.Select(r => r.ValorMostrado).ToList()
+                    });
+                }
+                return BadRequest(new { error = "Parámetros inválidos para gráfica por rango de fechas." });
+            }
+        }
     }
 }

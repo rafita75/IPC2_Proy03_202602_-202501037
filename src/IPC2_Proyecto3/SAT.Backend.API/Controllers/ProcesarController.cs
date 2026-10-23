@@ -1,5 +1,8 @@
 ﻿using System.Collections.Generic;
+using System.IO;
+using System.Text;
 using System.Text.Json;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using SAT.Backend.API.Models;
 using SAT.Backend.API.Services;
@@ -16,70 +19,98 @@ namespace SAT.Backend.API.Controllers
             _satService = satService;
         }
 
-        /// <summary>
-        /// Endpoint principal sugerido en la Fig. 2 (POST /Procesar).
-        /// Detecta automáticamente si el JSON entrante corresponde a actualización de RTU o a Autorización de DTEs.
-        /// </summary>
         [HttpPost("/Procesar")]
-        public IActionResult ProcesarAutomatico([FromBody] JsonElement payload)
+        public async Task<IActionResult> ProcesarAutomatico()
         {
-            if (payload.ValueKind != JsonValueKind.Array)
+            string rawJson;
+            using (var reader = new StreamReader(Request.Body, Encoding.UTF8))
             {
-                return BadRequest(new { error = "El mensaje JSON de entrada debe ser un arreglo [...]" });
+                rawJson = await reader.ReadToEndAsync();
             }
 
-            string rawJson = payload.GetRawText();
-
-            // Si el arreglo está vacío, devolvemos respuesta vacía de RTU por defecto
-            if (payload.GetArrayLength() == 0)
+            if (string.IsNullOrWhiteSpace(rawJson))
             {
-                return Ok(new RespuestaRtuDto());
+                return BadRequest(new { error = "El cuerpo del mensaje JSON está vacío." });
             }
 
-            JsonElement primerElemento = payload[0];
-
-            // Si el primer objeto contiene la propiedad "TIEMPO" o "REFERENCIA", es un archivo de facturas (DTE)
-            if (primerElemento.TryGetProperty("TIEMPO", out _) || primerElemento.TryGetProperty("REFERENCIA", out _))
+            JsonDocument doc;
+            try
             {
-                var solicitudesFacturas = JsonSerializer.Deserialize<List<SolicitudAutorizacionDto>>(rawJson);
-                var resultadoFacturas = _satService.ProcesarAutorizaciones(solicitudesFacturas ?? new());
-                return Ok(resultadoFacturas);
+                doc = JsonDocument.Parse(rawJson);
+            }
+            catch (JsonException)
+            {
+                return BadRequest(new { error = "El archivo enviado no tiene un formato JSON válido." });
             }
 
-            // Si contiene "NIT" o "nombre", es una actualización del RTU
-            if (primerElemento.TryGetProperty("NIT", out _) || primerElemento.TryGetProperty("nombre", out _))
+            using (doc)
             {
-                var solicitudesRtu = JsonSerializer.Deserialize<List<ContribuyenteDto>>(rawJson);
-                var resultadoRtu = _satService.ProcesarActualizacionRtu(solicitudesRtu ?? new());
-                return Ok(resultadoRtu);
-            }
+                JsonElement payload = doc.RootElement;
 
-            return BadRequest(new { error = "No se reconoció la estructura del JSON enviado." });
+                if (payload.ValueKind != JsonValueKind.Array)
+                {
+                    return BadRequest(new { error = "El mensaje JSON de entrada debe ser un arreglo [...]" });
+                }
+
+                if (payload.GetArrayLength() == 0)
+                {
+                    return BadRequest(new { error = "El arreglo JSON no contiene elementos para procesar." });
+                }
+
+                JsonElement primerElemento = payload[0];
+                if (primerElemento.ValueKind != JsonValueKind.Object)
+                {
+                    return BadRequest(new { error = "Los elementos del arreglo deben ser objetos JSON." });
+                }
+
+                // Detectar si es solicitud de Autorización de Facturas (DTE)
+                if (primerElemento.TryGetProperty("TIEMPO", out _) ||
+                    primerElemento.TryGetProperty("REFERENCIA", out _) ||
+                    primerElemento.TryGetProperty("NIT_EMISOR", out _) ||
+                    primerElemento.TryGetProperty("NIT EMISOR", out _))
+                {
+                    try
+                    {
+                        var solicitudesFacturas = JsonSerializer.Deserialize<List<SolicitudAutorizacionDto>>(rawJson);
+                        var resultadoFacturas = _satService.ProcesarAutorizaciones(solicitudesFacturas ?? new());
+                        return Ok(resultadoFacturas);
+                    }
+                    catch (JsonException)
+                    {
+                        return BadRequest(new { error = "Valores numéricos o estructura inválida en las facturas." });
+                    }
+                }
+
+                // Detectar si es actualización del RTU
+                if (primerElemento.TryGetProperty("NIT", out _) && primerElemento.TryGetProperty("nombre", out _))
+                {
+                    var solicitudesRtu = JsonSerializer.Deserialize<List<ContribuyenteDto>>(rawJson);
+                    var resultadoRtu = _satService.ProcesarActualizacionRtu(solicitudesRtu ?? new());
+                    return Ok(resultadoRtu);
+                }
+
+                return BadRequest(new { error = "No se reconoció la estructura del JSON enviado." });
+            }
         }
 
-        /// <summary>
-        /// Ruta explícita para actualizar el RTU (POST /Procesar/Rtu).
-        /// </summary>
         [HttpPost("/Procesar/Rtu")]
         public ActionResult<RespuestaRtuDto> ProcesarRtu([FromBody] List<ContribuyenteDto> solicitudes)
         {
-            var respuesta = _satService.ProcesarActualizacionRtu(solicitudes);
-            return Ok(respuesta);
+            if (solicitudes == null || solicitudes.Count == 0)
+                return BadRequest(new { error = "El listado de RTU está vacío." });
+
+            return Ok(_satService.ProcesarActualizacionRtu(solicitudes));
         }
 
-        /// <summary>
-        /// Ruta explícita para solicitar autorización de facturas (POST /Procesar/Autorizaciones).
-        /// </summary>
         [HttpPost("/Procesar/Autorizaciones")]
         public ActionResult<RespuestaAutorizacionWrapperDto> ProcesarAutorizaciones([FromBody] List<SolicitudAutorizacionDto> solicitudes)
         {
-            var respuesta = _satService.ProcesarAutorizaciones(solicitudes);
-            return Ok(respuesta);
+            if (solicitudes == null || solicitudes.Count == 0)
+                return BadRequest(new { error = "El listado de facturas está vacío." });
+
+            return Ok(_satService.ProcesarAutorizaciones(solicitudes));
         }
 
-        /// <summary>
-        /// Devuelve el sistema al estado inicial (sin datos), limpiando memoria y archivos JSON.
-        /// </summary>
         [HttpPost("/Resetear")]
         [HttpPost("/Inicializar")]
         [HttpDelete("/Resetear")]

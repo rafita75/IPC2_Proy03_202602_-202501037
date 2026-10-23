@@ -1,13 +1,14 @@
 ﻿@page
+@using System.Text.Json
 @model SAT.Frontend.Web.Pages.PeticionesModel
 @{
-    ViewData["Title"] = "Peticiones y Reportes";
+    ViewData["Title"] = "Peticiones, Gráficas y PDF";
 }
 
 <div class="row mb-3">
     <div class="col-12">
-        <h2 class="fw-bold text-primary">Peticiones y Consultas al Servicio 2</h2>
-        <p class="text-muted">Selecciona cualquiera de las 3 consultas requeridas para visualizar los reportes procesados por la API.</p>
+        <h2 class="fw-bold text-primary">Peticiones, Gráficas y Reportes en PDF</h2>
+        <p class="text-muted">Ejecuta cualquiera de las 3 consultas para visualizar los datos estadísticos, sus gráficas y exportar el reporte en formato PDF.</p>
     </div>
 </div>
 
@@ -16,9 +17,8 @@
     <div class="alert alert-danger">@Model.MensajeError</div>
 }
 
-<!-- Tres tarjetas con los formularios de filtro -->
 <div class="row g-4 mb-4">
-    <!-- Opción 1: Consultar Contribuyente -->
+    <!-- Consultar Contribuyente -->
     <div class="col-md-4">
         <div class="card shadow-sm h-100 border-primary">
             <div class="card-header bg-primary text-white fw-bold">
@@ -51,7 +51,7 @@
         </div>
     </div>
 
-    <!-- Opción 2: Resumen de IVA por Fecha y NIT -->
+    <!-- Resumen de IVA por Fecha y NIT -->
     <div class="col-md-4">
         <div class="card shadow-sm h-100 border-success">
             <div class="card-header bg-success text-white fw-bold">
@@ -62,15 +62,15 @@
                     <div class="mb-3">
                         <label class="form-label fw-semibold">Seleccionar Fecha:</label>
                         <input type="date" asp-for="FechaResumenIva" class="form-control" required />
-                        <div class="form-text">Muestra por cada NIT el IVA emitido y el IVA recibido en la fecha seleccionada.</div>
+                        <div class="form-text">Muestra tabla y gráfica de IVA emitido e IVA recibido por cada NIT en esa fecha.</div>
                     </div>
-                    <button type="submit" class="btn btn-success w-100 fw-bold mt-4">Generar Resumen de IVA</button>
+                    <button type="submit" class="btn btn-success w-100 fw-bold mt-4">Generar Resumen y Gráfica de IVA</button>
                 </form>
             </div>
         </div>
     </div>
 
-    <!-- Opción 3: Resumen por Rango de Fechas -->
+    <!-- Resumen por Rango de Fechas -->
     <div class="col-md-4">
         <div class="card shadow-sm h-100 border-dark">
             <div class="card-header bg-dark text-white fw-bold">
@@ -93,20 +93,26 @@
                             <option value="false">Valores Sin IVA</option>
                         </select>
                     </div>
-                    <button type="submit" class="btn btn-dark w-100 fw-bold">Consultar Rango y Estadísticas</button>
+                    <button type="submit" class="btn btn-dark w-100 fw-bold">Consultar Rango y Gráfica</button>
                 </form>
             </div>
         </div>
     </div>
 </div>
 
-<!-- ==================== SECCIÓN DE RESULTADOS ==================== -->
+<!--  SECCIÓN DE RESULTADOS, GRÁFICAS Y PDF  -->
 
 @if (Model.ResultadoContribuyente != null)
 {
-    <div class="card shadow-sm mb-4">
+    <div class="d-flex justify-content-end mb-2">
+        <button type="button" class="btn btn-danger fw-bold shadow-sm" onclick="descargarPdf('areaReporteContribuyente', 'Reporte_Contribuyente_@Model.ResultadoContribuyente.Nit')">
+            📄 Descargar Reporte en PDF
+        </button>
+    </div>
+
+    <div id="areaReporteContribuyente" class="card shadow-sm mb-4">
         <div class="card-header bg-primary text-white fw-bold">
-            Resultado: Consulta de Contribuyente (@Model.ResultadoContribuyente.TipoOperacion)
+            Reporte SAT: Consulta de Contribuyente (@Model.ResultadoContribuyente.TipoOperacion)
         </div>
         <div class="card-body">
             <div class="row mb-3">
@@ -144,7 +150,7 @@
                 </tbody>
             </table>
 
-            <h5 class="fw-bold mt-4">Listado de Facturas (@Model.ResultadoContribuyente.TipoOperacion)</h5>
+            <h5 class="fw-bold mt-4">Listado Detallado de Facturas (@Model.ResultadoContribuyente.TipoOperacion)</h5>
             <table class="table table-sm table-bordered">
                 <thead class="table-secondary">
                     <tr>
@@ -180,12 +186,18 @@
 
 @if (Model.ResultadoResumenIva != null)
 {
-    <div class="card shadow-sm mb-4">
+    <div class="d-flex justify-content-end mb-2">
+        <button type="button" class="btn btn-danger fw-bold shadow-sm" onclick="descargarPdf('areaReporteIva', 'Reporte_Resumen_IVA')">
+            📄 Descargar Reporte en PDF
+        </button>
+    </div>
+
+    <div id="areaReporteIva" class="card shadow-sm mb-4">
         <div class="card-header bg-success text-white fw-bold">
-            Resultado: Resumen de Movimientos de IVA por NIT (Fecha: @Model.ResultadoResumenIva.Fecha)
+            Reporte SAT: Resumen de Movimientos de IVA por NIT (Fecha: @Model.ResultadoResumenIva.Fecha)
         </div>
         <div class="card-body">
-            <table class="table table-bordered table-striped">
+            <table class="table table-bordered table-striped mb-4">
                 <thead class="table-dark">
                     <tr>
                         <th>NIT</th>
@@ -210,15 +222,28 @@
                     }
                 </tbody>
             </table>
+
+            <!-- Gráfica 1: Resumen de IVA por Fecha y NIT -->
+            <hr />
+            <h5 class="fw-bold text-success mt-3 mb-3">Gráfica Comparativa: IVA Emitido vs. IVA Recibido (@Model.ResultadoResumenIva.Fecha)</h5>
+            <div class="p-3 bg-white border rounded" style="max-height: 420px;">
+                <canvas id="graficaIvaCanvas"></canvas>
+            </div>
         </div>
     </div>
 }
 
 @if (Model.ResultadoResumenRango != null)
 {
-    <div class="card shadow-sm mb-4">
+    <div class="d-flex justify-content-end mb-2">
+        <button type="button" class="btn btn-danger fw-bold shadow-sm" onclick="descargarPdf('areaReporteRango', 'Reporte_Rango_Fechas')">
+            📄 Descargar Reporte en PDF
+        </button>
+    </div>
+
+    <div id="areaReporteRango" class="card shadow-sm mb-4">
         <div class="card-header bg-dark text-white fw-bold">
-            Resultado: Resumen por Rango de Fechas (@Model.ResultadoResumenRango.FechaInicio al @Model.ResultadoResumenRango.FechaFin)
+            Reporte SAT: Resumen por Rango de Fechas (@Model.ResultadoResumenRango.FechaInicio al @Model.ResultadoResumenRango.FechaFin)
         </div>
         <div class="card-body">
             <h5 class="fw-bold">Valores Autorizados por Fecha (@(Model.ResultadoResumenRango.MostrarValoresTotales ? "Valores Totales con IVA" : "Valores Sin IVA"))</h5>
@@ -244,7 +269,17 @@
                 </tbody>
             </table>
 
-            <h5 class="fw-bold">Reporte Estadístico de Facturas y Errores por Fecha</h5>
+            <!-- Gráfica 2: Resumen por Rango de Fechas -->
+            <hr />
+            <h5 class="fw-bold text-primary mt-3 mb-3">
+                Gráfica de Valores Autorizados por Fecha (@(Model.ResultadoResumenRango.MostrarValoresTotales ? "Totales con IVA" : "Valores Sin IVA"))
+            </h5>
+            <div class="p-3 bg-white border rounded mb-4" style="max-height: 420px;">
+                <canvas id="graficaRangoCanvas"></canvas>
+            </div>
+
+            <hr />
+            <h5 class="fw-bold mt-3">Detalle Estadístico de Facturas Recibidas y Errores por Fecha</h5>
             <div class="table-responsive">
                 <table class="table table-sm table-bordered table-hover text-center align-middle">
                     <thead class="table-secondary">
@@ -286,4 +321,106 @@
             </div>
         </div>
     </div>
+}
+
+@section Scripts {
+    <!-- Librerías para Gráficas (Chart.js) y Exportación a PDF (html2pdf.js) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <script>
+        // Función para exportar cualquier reporte (con su tabla y gráfica) a archivo PDF
+        function descargarPdf(idContenedor, nombreArchivo) {
+            const elemento = document.getElementById(idContenedor);
+            const opciones = {
+                margin: 8,
+                filename: nombreArchivo + '.pdf',
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2, useCORS: true },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+            };
+            html2pdf().set(opciones).from(elemento).save();
+        }
+    </script>
+
+    @if (Model.ResultadoResumenIva != null)
+    {
+        var etiquetasNits = JsonSerializer.Serialize(Model.ResultadoResumenIva.MovimientosPorNit.Select(m => $"{m.Nit} ({m.Nombre})"));
+        var datosEmitido = JsonSerializer.Serialize(Model.ResultadoResumenIva.MovimientosPorNit.Select(m => m.IvaEmitido));
+        var datosRecibido = JsonSerializer.Serialize(Model.ResultadoResumenIva.MovimientosPorNit.Select(m => m.IvaRecibido));
+
+        <script>
+            document.addEventListener("DOMContentLoaded", function () {
+                const ctxIva = document.getElementById('graficaIvaCanvas');
+                if (ctxIva) {
+                    new Chart(ctxIva, {
+                        type: 'bar',
+                        data: {
+                            labels: @Html.Raw(etiquetasNits),
+                            datasets: [
+                                {
+                                    label: 'IVA Emitido (Q)',
+                                    data: @Html.Raw(datosEmitido),
+                                    backgroundColor: 'rgba(13, 110, 253, 0.75)',
+                                    borderColor: 'rgb(13, 110, 253)',
+                                    borderWidth: 1
+                                },
+                                {
+                                    label: 'IVA Recibido (Q)',
+                                    data: @Html.Raw(datosRecibido),
+                                    backgroundColor: 'rgba(25, 135, 84, 0.75)',
+                                    borderColor: 'rgb(25, 135, 84)',
+                                    borderWidth: 1
+                                }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                y: { beginAtZero: true }
+                            }
+                        }
+                    });
+                }
+            });
+        </script>
+    }
+
+    @if (Model.ResultadoResumenRango != null)
+    {
+        var etiquetasFechas = JsonSerializer.Serialize(Model.ResultadoResumenRango.ReportePorFechas.Select(r => r.Fecha));
+        var datosMontos = JsonSerializer.Serialize(Model.ResultadoResumenRango.ReportePorFechas.Select(r => r.ValorMostrado));
+        var tituloSerie = Model.ResultadoResumenRango.MostrarValoresTotales ? "Monto Total Autorizado con IVA (Q)" : "Monto Autorizado Sin IVA (Q)";
+
+        <script>
+            document.addEventListener("DOMContentLoaded", function () {
+                const ctxRango = document.getElementById('graficaRangoCanvas');
+                if (ctxRango) {
+                    new Chart(ctxRango, {
+                        type: 'bar',
+                        data: {
+                            labels: @Html.Raw(etiquetasFechas),
+                            datasets: [
+                                {
+                                    label: '@tituloSerie',
+                                    data: @Html.Raw(datosMontos),
+                                    backgroundColor: 'rgba(33, 37, 41, 0.8)',
+                                    borderColor: 'rgb(33, 37, 41)',
+                                    borderWidth: 1
+                                }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                y: { beginAtZero: true }
+                            }
+                        }
+                    });
+                }
+            });
+        </script>
+    }
 }

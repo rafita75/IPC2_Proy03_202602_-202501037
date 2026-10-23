@@ -17,7 +17,6 @@ namespace SAT.Backend.API.Services
         private readonly string _archivoCorrelativos;
         private readonly object _lock = new object();
 
-        // Estructuras en memoria
         private Dictionary<string, string> _rtu = new();
         private List<RegistroFactura> _facturas = new();
         private Dictionary<string, int> _correlativosPorDia = new();
@@ -25,8 +24,6 @@ namespace SAT.Backend.API.Services
         public SatDataService(ValidadorService validador, IWebHostEnvironment env)
         {
             _validador = validador;
-
-            // Definir la carpeta "Data" dentro del proyecto Backend
             _carpetaDatos = Path.Combine(env.ContentRootPath, "Data");
             _archivoRtu = Path.Combine(_carpetaDatos, "rtu.json");
             _archivoFacturas = Path.Combine(_carpetaDatos, "facturas.json");
@@ -34,8 +31,6 @@ namespace SAT.Backend.API.Services
 
             CargarDatosDesdeArchivos();
         }
-
-        // 1. PERSISTENCIA EN ARCHIVOS 
 
         private void CargarDatosDesdeArchivos()
         {
@@ -76,9 +71,6 @@ namespace SAT.Backend.API.Services
             File.WriteAllText(_archivoCorrelativos, JsonSerializer.Serialize(_correlativosPorDia, opciones));
         }
 
-        /// <summary>
-        /// Devuelve el sistema al estado inicial (sin datos).
-        /// </summary>
         public void ResetearDatos()
         {
             lock (_lock)
@@ -89,8 +81,6 @@ namespace SAT.Backend.API.Services
                 GuardarDatosEnArchivos();
             }
         }
-
-        // 2. ACTUALIZACIÓN DEL RTU 
 
         public RespuestaRtuDto ProcesarActualizacionRtu(List<ContribuyenteDto> solicitudes)
         {
@@ -106,14 +96,12 @@ namespace SAT.Backend.API.Services
                     string nit = (item.Nit ?? string.Empty).Trim().ToUpperInvariant();
                     string nombre = (item.Nombre ?? string.Empty).Trim();
 
-                    // Validar NIT con algoritmo Módulo 11
                     if (!_validador.EsNitValido(nit))
                     {
                         respuesta.NitsInvalidos++;
                         continue;
                     }
 
-                    // Si ya existe en el RTU se actualiza, si no existe se crea
                     if (_rtu.ContainsKey(nit))
                     {
                         _rtu[nit] = nombre;
@@ -132,8 +120,6 @@ namespace SAT.Backend.API.Services
             return respuesta;
         }
 
-        //  3. AUTORIZACIÓN DE FACTURAS (DTE) 
-
         public RespuestaAutorizacionWrapperDto ProcesarAutorizaciones(List<SolicitudAutorizacionDto> solicitudes)
         {
             var resultado = new ResultadoAutorizacionesDto();
@@ -143,23 +129,23 @@ namespace SAT.Backend.API.Services
 
             lock (_lock)
             {
-                // Conjunto de referencias ya registradas para detectar duplicados rápido
-                var referenciasExistentes = new HashSet<string>(
-                    _facturas.Select(f => f.Referencia),
-                    StringComparer.OrdinalIgnoreCase);
+                var referenciasExistentes = new HashSet<string>(_facturas.Select(f => f.Referencia));
+
+                // Fecha de hoy en Guatemala (UTC-6) para el código de autorización yyyymmdd########
+                string claveHoyGuatemala = DateTime.UtcNow.AddHours(-6).ToString("yyyyMMdd");
 
                 foreach (var sol in solicitudes)
                 {
-                    // Extraer fecha y hora limpias con Regex
-                    if (!_validador.ExtraerFechaYHora(sol.Tiempo, out string fechaStr, out string horaStr, out DateTime fechaDt))
+                    string referencia = (sol.Referencia ?? string.Empty).Trim();
+
+                    // Si TIEMPO no contiene fecha y hora válidas o la referencia excede 40 caracteres, se descarta por formato
+                    if (!_validador.ExtraerFechaYHora(sol.Tiempo, out string fechaStr, out string horaStr, out _) ||
+                        !_validador.EsReferenciaFormatoValido(referencia))
                     {
-                        // Si no trae una fecha reconocible, se asigna fecha actual por defecto para poder registrarla
-                        fechaDt = DateTime.Today;
-                        fechaStr = fechaDt.ToString("dd/MM/yyyy");
-                        horaStr = "00:00";
+                        resultado.CantidadDescartadasPorFormato++;
+                        continue;
                     }
 
-                    string referencia = (sol.Referencia ?? string.Empty).Trim();
                     string nitEmisor = (sol.NitEmisor ?? string.Empty).Trim().ToUpperInvariant();
                     string nitReceptor = (sol.NitReceptor ?? string.Empty).Trim().ToUpperInvariant();
 
@@ -175,10 +161,11 @@ namespace SAT.Backend.API.Services
                         Total = sol.Total
                     };
 
-                    // 1. Validar NIT Emisor (Formato/Módulo 11 y existencia en RTU)
+                    // 1. Validar NIT Emisor
                     if (!_validador.EsNitValido(nitEmisor))
                     {
                         registro.ErrorNitEmisorInvalido = true;
+                        resultado.CantidadRechazadasNitEmisorInvalido++;
                     }
                     else if (!_rtu.ContainsKey(nitEmisor))
                     {
@@ -186,10 +173,11 @@ namespace SAT.Backend.API.Services
                         resultado.CantidadRechazadasNitEmisorInexistente++;
                     }
 
-                    // 2. Validar NIT Receptor (Formato/Módulo 11 y existencia en RTU)
+                    // 2. Validar NIT Receptor
                     if (!_validador.EsNitValido(nitReceptor))
                     {
                         registro.ErrorNitReceptorInvalido = true;
+                        resultado.CantidadRechazadasNitReceptorInvalido++;
                     }
                     else if (!_rtu.ContainsKey(nitReceptor))
                     {
@@ -201,20 +189,24 @@ namespace SAT.Backend.API.Services
                     if (!_validador.EsIvaValido(sol.Valor, sol.Iva))
                     {
                         registro.ErrorIvaMalCalculado = true;
+                        resultado.CantidadRechazadasIvaMalCalculado++;
                     }
 
                     if (!_validador.EsTotalValido(sol.Valor, sol.Iva, sol.Total))
                     {
                         registro.ErrorTotalMalCalculado = true;
+                        resultado.CantidadRechazadasTotalMalCalculado++;
                     }
 
-                    // 4. Validar Referencia (formato máx 40 caracteres y que sea única)
-                    if (!_validador.EsReferenciaFormatoValido(referencia) || referenciasExistentes.Contains(referencia))
+                    // 4. Validar Referencia duplicada
+                    if (referenciasExistentes.Contains(referencia))
                     {
                         registro.ErrorReferenciaDuplicada = true;
+                        resultado.CantidadRechazadasReferenciaDuplicada++;
                     }
 
-                    // Verificar si la factura no tuvo ningún error
+                    referenciasExistentes.Add(referencia);
+
                     bool tieneErrores = registro.ErrorNitEmisorInvalido
                                      || registro.ErrorNitReceptorInvalido
                                      || registro.ErrorNitEmisorInexistente
@@ -223,21 +215,23 @@ namespace SAT.Backend.API.Services
                                      || registro.ErrorTotalMalCalculado
                                      || registro.ErrorReferenciaDuplicada;
 
-                    if (!tieneErrores)
+                    if (tieneErrores)
+                    {
+                        resultado.CantidadAutorizacionesRechazadas++;
+                    }
+                    else
                     {
                         registro.Aprobada = true;
 
-                        // Generar número de autorización: yyyymmdd########
-                        string claveDia = fechaDt.ToString("yyyyMMdd");
-                        if (!_correlativosPorDia.ContainsKey(claveDia))
+                        if (!_correlativosPorDia.ContainsKey(claveHoyGuatemala))
                         {
-                            _correlativosPorDia[claveDia] = 0;
+                            _correlativosPorDia[claveHoyGuatemala] = 0;
                         }
 
-                        _correlativosPorDia[claveDia]++;
-                        int correlativoActual = _correlativosPorDia[claveDia];
+                        _correlativosPorDia[claveHoyGuatemala]++;
+                        int correlativoActual = _correlativosPorDia[claveHoyGuatemala];
 
-                        string codigoStr = $"{claveDia}{correlativoActual:D8}";
+                        string codigoStr = $"{claveHoyGuatemala}{correlativoActual:D8}";
                         registro.CodigoAprobacion = long.Parse(codigoStr);
 
                         resultado.CantidadAutorizacionesAprobadas++;
@@ -246,12 +240,6 @@ namespace SAT.Backend.API.Services
                             Referencia = referencia,
                             CodigoAprobacion = registro.CodigoAprobacion
                         });
-                    }
-
-                    // Registrar la referencia vista y guardar la factura en el historial
-                    if (!string.IsNullOrWhiteSpace(referencia))
-                    {
-                        referenciasExistentes.Add(referencia);
                     }
 
                     _facturas.Add(registro);
@@ -266,7 +254,6 @@ namespace SAT.Backend.API.Services
             };
         }
 
-        // Métodos de acceso para las consultas que haremos en la Fase 3
         public IReadOnlyDictionary<string, string> ObtenerRtu() => _rtu;
         public IReadOnlyList<RegistroFactura> ObtenerFacturas() => _facturas;
     }

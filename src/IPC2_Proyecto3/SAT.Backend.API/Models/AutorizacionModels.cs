@@ -3,7 +3,6 @@ using System.Text.Json.Serialization;
 
 namespace SAT.Backend.API.Models
 {
-    // Mensaje de entrada para solicitar autorización de factura
     public class SolicitudAutorizacionDto
     {
         [JsonPropertyName("TIEMPO")]
@@ -15,8 +14,23 @@ namespace SAT.Backend.API.Models
         [JsonPropertyName("NIT EMISOR")]
         public string NitEmisor { get; set; } = string.Empty;
 
+        // Soporte simultáneo para los archivos de prueba que usan guion bajo
+        [JsonPropertyName("NIT_EMISOR")]
+        public string NitEmisorGuion
+        {
+            get => NitEmisor;
+            set { if (!string.IsNullOrEmpty(value)) NitEmisor = value; }
+        }
+
         [JsonPropertyName("NIT RECEPTOR")]
         public string NitReceptor { get; set; } = string.Empty;
+
+        [JsonPropertyName("NIT_RECEPTOR")]
+        public string NitReceptorGuion
+        {
+            get => NitReceptor;
+            set { if (!string.IsNullOrEmpty(value)) NitReceptor = value; }
+        }
 
         [JsonPropertyName("VALOR")]
         public decimal Valor { get; set; }
@@ -28,7 +42,6 @@ namespace SAT.Backend.API.Models
         public decimal Total { get; set; }
     }
 
-    // Envoltorio principal del mensaje de respuesta de autorizaciones
     public class RespuestaAutorizacionWrapperDto
     {
         [JsonPropertyName("resultadoAutorizaciones")]
@@ -45,6 +58,27 @@ namespace SAT.Backend.API.Models
 
         [JsonPropertyName("cantidadAutorizacionesRechazadasPorNitReceptorInexistente")]
         public int CantidadRechazadasNitReceptorInexistente { get; set; }
+
+        [JsonPropertyName("cantidadAutorizacionesRechazadasPorNitEmisorInvalido")]
+        public int CantidadRechazadasNitEmisorInvalido { get; set; }
+
+        [JsonPropertyName("cantidadAutorizacionesRechazadasPorNitReceptorInvalido")]
+        public int CantidadRechazadasNitReceptorInvalido { get; set; }
+
+        [JsonPropertyName("cantidadAutorizacionesRechazadasPorIvaMalCalculado")]
+        public int CantidadRechazadasIvaMalCalculado { get; set; }
+
+        [JsonPropertyName("cantidadAutorizacionesRechazadasPorTotalMalCalculado")]
+        public int CantidadRechazadasTotalMalCalculado { get; set; }
+
+        [JsonPropertyName("cantidadAutorizacionesRechazadasPorReferenciaDuplicada")]
+        public int CantidadRechazadasReferenciaDuplicada { get; set; }
+
+        [JsonPropertyName("cantidadAutorizacionesRechazadas")]
+        public int CantidadAutorizacionesRechazadas { get; set; }
+
+        [JsonPropertyName("cantidadDescartadasPorFormato")]
+        public int CantidadDescartadasPorFormato { get; set; }
 
         [JsonPropertyName("detalleAprobaciones")]
         public List<DetalleAprobacionDto> DetalleAprobaciones { get; set; } = new();
